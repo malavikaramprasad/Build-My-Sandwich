@@ -1,9 +1,12 @@
 import React, {Component} from 'react';
-import Holder from '../../hoc/Holder';
+import Holder from '../../hoc/Holder/Holder';
 import Sandwich from '../../components/Sandwich/Sandwich'
 import BuildControls from '../../components/Sandwich/BuildControls/BuildControls';
 import Modal from '../../components/UI/Modal/Modal';
 import OrderSummary from '../../components/Sandwich/OrderSummary/OrderSummary';
+import axios from '../../axios-orders';
+import Spinner from '../../components/UI/Spinner/Spinner';
+import withErrorHandler from '../../hoc/withErrorHandler/withErrorHandler';
 
 const INGREDIENT_PRICES = {
     salad: 0.7,
@@ -23,7 +26,8 @@ class SandwichBuilder extends Component{
         },
         totalPrice: 5,
         purchase: false,
-        purchasing: false
+        purchasing: false,
+        loading: false
     };
 
     addIngredient = (type) => {
@@ -83,7 +87,32 @@ class SandwichBuilder extends Component{
     };
 
     purchaseContinue = () => {
-        alert('Continue');
+        //alert('Continue');
+        this.setState({loading:true})
+        const order = {
+            ingredients: this.state.ingredients,
+            price: this.state.totalPrice,
+            customer: {
+                name: 'Leah',
+                address: {
+                    street: '710 W Carpenter',
+                    zipCode: '12345',
+                    country: 'US'
+                },
+                email: 'test@test.com'
+            },
+            deliveryMethod:'standard'
+        };
+        axios.post('/orders.json', order)
+            .then( response => {
+                    console.log(response);
+                    this.setState({loading:false, purchasing:false})
+            })
+            .catch(err => {
+                console.log(err);
+                this.setState({loading:false, purchasing:false})
+
+            });
     };
 
     render(){
@@ -93,13 +122,17 @@ class SandwichBuilder extends Component{
         for(let key in disableInfo){
             disableInfo[key] = disableInfo[key] <=0;
         }
+        let orderSummaryEl = <OrderSummary onOrderPurchase={this.purchaseContinue}
+                                           onOrderCancel={this.purchaseCancelled}
+                                           ingredients={this.state.ingredients}
+                                           total={this.state.totalPrice}/>;
+        if(this.state.loading){
+            orderSummaryEl = <Spinner/>
+        }
         return(
            <Holder>
                <Modal showModal={this.state.purchasing} modalClosed={this.purchaseCancelled}>
-                   <OrderSummary onOrderPurchase={this.purchaseContinue}
-                                onOrderCancel={this.purchaseCancelled}
-                                 ingredients={this.state.ingredients}
-                                 total={this.state.totalPrice}/>
+                   {orderSummaryEl}
                </Modal>
                <Sandwich ingredients={this.state.ingredients}/>
                <BuildControls ingredientAdded={this.addIngredient}
@@ -111,4 +144,4 @@ class SandwichBuilder extends Component{
     }
 }
 
-export default SandwichBuilder;
+export default withErrorHandler(SandwichBuilder, axios);
