@@ -18,17 +18,23 @@ const INGREDIENT_PRICES = {
 class SandwichBuilder extends Component{
 
     state = {
-        ingredients: {
-            salad: 0,
-            bacon: 0,
-            cheese: 0,
-            meat: 0
-        },
+        ingredients: null,
         totalPrice: 5,
         purchase: false,
         purchasing: false,
-        loading: false
+        loading: false,
+        error: false
     };
+
+    componentDidMount(){
+        axios.get("https://build-my-sandwich.firebaseio.com/ingredients.json")
+            .then(response => {
+                this.setState({ingredients: response.data})
+            })
+            .catch(error =>{
+                this.setState({error:true});
+            });
+    }
 
     addIngredient = (type) => {
         const oldCount = this.state.ingredients[type];
@@ -37,9 +43,9 @@ class SandwichBuilder extends Component{
             ...this.state.ingredients
         };
         updatedIngredients[type] = updatedCount;
-        const priceAddtion = INGREDIENT_PRICES[type];
+        const priceAddition = INGREDIENT_PRICES[type];
         const oldPrice  = this.state.totalPrice;
-        const newPrice = oldPrice + priceAddtion;
+        const newPrice = oldPrice + priceAddition;
 
         this.setState({
             totalPrice: newPrice,
@@ -88,31 +94,17 @@ class SandwichBuilder extends Component{
 
     purchaseContinue = () => {
         //alert('Continue');
-        this.setState({loading:true})
-        const order = {
-            ingredients: this.state.ingredients,
-            price: this.state.totalPrice,
-            customer: {
-                name: 'Leah',
-                address: {
-                    street: '710 W Carpenter',
-                    zipCode: '12345',
-                    country: 'US'
-                },
-                email: 'test@test.com'
-            },
-            deliveryMethod:'standard'
-        };
-        axios.post('/orders.json', order)
-            .then( response => {
-                    console.log(response);
-                    this.setState({loading:false, purchasing:false})
-            })
-            .catch(err => {
-                console.log(err);
-                this.setState({loading:false, purchasing:false})
-
-            });
+        //
+        const queryParam = [];
+        for(let i in this.state.ingredients){
+            queryParam.push(encodeURI(i) + '=' + encodeURIComponent(this.state.ingredients[i]));
+        }
+        queryParam.push('price='+ this.state.totalPrice);
+        const queryString = queryParam.join('&');
+        this.props.history.push({
+            pathname: '/checkout',
+            search:'?' + queryString
+        });
     };
 
     render(){
@@ -122,23 +114,34 @@ class SandwichBuilder extends Component{
         for(let key in disableInfo){
             disableInfo[key] = disableInfo[key] <=0;
         }
-        let orderSummaryEl = <OrderSummary onOrderPurchase={this.purchaseContinue}
+        let orderSummaryEl = null;
+        if(this.state.ingredients) {
+            orderSummaryEl = <OrderSummary onOrderPurchase={this.purchaseContinue}
                                            onOrderCancel={this.purchaseCancelled}
                                            ingredients={this.state.ingredients}
                                            total={this.state.totalPrice}/>;
+        }
+
+        let sandwich = this.state.error? <p> Ingredients can't be loaded </p> : <Spinner/>;
+        if(this.state.ingredients) {
+            sandwich = (<Holder>
+                <Sandwich ingredients={this.state.ingredients}/>
+                <BuildControls ingredientAdded={this.addIngredient}
+                               purchasable={this.state.purchase} ordered={this.purchaseHandler}
+                               ingredientRemoved={this.removeIngredient}
+                               disabled={disableInfo} price={this.state.totalPrice}/>
+            </Holder>);
+        }
         if(this.state.loading){
             orderSummaryEl = <Spinner/>
         }
+
         return(
            <Holder>
                <Modal showModal={this.state.purchasing} modalClosed={this.purchaseCancelled}>
                    {orderSummaryEl}
                </Modal>
-               <Sandwich ingredients={this.state.ingredients}/>
-               <BuildControls ingredientAdded={this.addIngredient}
-                         purchasable={this.state.purchase} ordered={this.purchaseHandler}
-                         ingredientRemoved={this.removeIngredient}
-                         disabled={disableInfo} price={this.state.totalPrice}/>
+               {sandwich}
            </Holder>
         );
     }
