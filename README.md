@@ -557,6 +557,7 @@ class Button extends Component {
 
 ### Result
 
+
 No clashes from other `.error` class names
 
 ```html
